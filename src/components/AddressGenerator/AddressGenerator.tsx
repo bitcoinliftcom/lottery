@@ -2,24 +2,27 @@ import { useState } from 'react';
 import { ethers } from 'ethers';
 import { SuiClient } from '@mysten/sui.js/client';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import './AddressGenerator.scss';
 
 interface AddressGeneratorProps {
   seedPhrase: string[];
 }
 
+type Network = 'ETH' | 'SUI' | 'SOL';
+
 interface WalletInfo {
   ethAddress?: string;
   suiAddress?: string;
+  solAddress?: string;
   privateKey: string;
   balances: {
     ETH?: string;
     SUI?: string;
+    SOL?: string;
   };
   index: number;
 }
-
-type Network = 'ETH' | 'SUI';
 
 export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
   const [numberOfAddresses, setNumberOfAddresses] = useState<number>(5);
@@ -27,6 +30,9 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [selectedNetworks, setSelectedNetworks] = useState<Network[]>(['ETH']);
+
+  // Add Solana connection constant
+  const solanaConnection = new Connection('https://api.mainnet-beta.solana.com');
 
   const getEthBalance = async (address: string) => {
     const provider = new ethers.JsonRpcProvider('https://eth.llamarpc.com');
@@ -52,6 +58,17 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
     }
   };
 
+  const getSolanaBalance = async (address: string) => {
+    try {
+      const publicKey = new PublicKey(address);
+      const balance = await solanaConnection.getBalance(publicKey);
+      return (balance / 1000000000).toString(); // Convert lamports to SOL
+    } catch (error) {
+      console.error('Error getting Solana balance:', error);
+      return '0';
+    }
+  };
+
   const deriveSuiAddress = (mnemonic: string, index: number) => {
     // Create master node
     const masterNode = ethers.HDNodeWallet.fromPhrase(mnemonic);
@@ -70,6 +87,28 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
     
     return {
       address: keypair.getPublicKey().toSuiAddress(),
+      privateKey: currentNode.privateKey
+    };
+  };
+
+  const deriveSolanaAddress = (mnemonic: string, index: number) => {
+    // Create master node
+    const masterNode = ethers.HDNodeWallet.fromPhrase(mnemonic);
+    
+    // Derive path for Solana (m/44'/501'/0'/0')
+    const solPath = [44, 501, 0, 0, index];
+    let currentNode = masterNode;
+    
+    for (const step of solPath) {
+      currentNode = currentNode.deriveChild(step);
+    }
+    
+    // Convert private key to Solana keypair
+    const privateKeyBytes = Buffer.from(currentNode.privateKey.slice(2), 'hex');
+    const keypair = Keypair.fromSeed(privateKeyBytes.slice(0, 32));
+    
+    return {
+      address: keypair.publicKey.toString(),
       privateKey: currentNode.privateKey
     };
   };
@@ -102,6 +141,13 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
           wallet.suiAddress = suiWallet.address;
           if (!wallet.privateKey) wallet.privateKey = suiWallet.privateKey;
           balances.SUI = await getSuiBalance(suiWallet.address);
+        }
+
+        if (selectedNetworks.includes('SOL')) {
+          const solWallet = deriveSolanaAddress(mnemonic, i);
+          wallet.solAddress = solWallet.address;
+          if (!wallet.privateKey) wallet.privateKey = solWallet.privateKey;
+          balances.SOL = await getSolanaBalance(solWallet.address);
         }
         
         newWallets.push(wallet);
@@ -169,6 +215,14 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
               />
               SUI
             </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedNetworks.includes('SOL')}
+                onChange={() => toggleNetwork('SOL')}
+              />
+              Solana
+            </label>
           </div>
         </div>
 
@@ -189,8 +243,10 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
                 <th>Index</th>
                 {selectedNetworks.includes('ETH') && <th>ETH Address</th>}
                 {selectedNetworks.includes('SUI') && <th>SUI Address</th>}
+                {selectedNetworks.includes('SOL') && <th>SOL Address</th>}
                 {selectedNetworks.includes('ETH') && <th>ETH Balance</th>}
                 {selectedNetworks.includes('SUI') && <th>SUI Balance</th>}
+                {selectedNetworks.includes('SOL') && <th>SOL Balance</th>}
                 <th>Private Key</th>
               </tr>
             </thead>
@@ -202,8 +258,10 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
                   <td>{wallet.index}</td>
                   {selectedNetworks.includes('ETH') && <td>{wallet.ethAddress}</td>}
                   {selectedNetworks.includes('SUI') && <td>{wallet.suiAddress}</td>}
+                  {selectedNetworks.includes('SOL') && <td>{wallet.solAddress}</td>}
                   {selectedNetworks.includes('ETH') && <td>{wallet.balances.ETH}</td>}
                   {selectedNetworks.includes('SUI') && <td>{wallet.balances.SUI}</td>}
+                  {selectedNetworks.includes('SOL') && <td>{wallet.balances.SOL}</td>}
                   <td>
                     {Object.values(wallet.balances).some(balance => Number(balance) > 0) 
                       ? wallet.privateKey 

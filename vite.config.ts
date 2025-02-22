@@ -10,10 +10,24 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      'buffer': 'buffer',
+      buffer: 'buffer',
     },
   },
   optimizeDeps: {
-    include: ['buffer'],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
   },
+  build: {
+    rollupOptions: {
+      plugins: [],
+      output: {
+        manualChunks: {
+          'buffer': ['buffer']
+        }
+      }
+    }
+  }
 })
