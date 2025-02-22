@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import { SuiClient } from '@mysten/sui.js/client';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
+import { Modal } from '../Modal/Modal';
 import './AddressGenerator.scss';
 
 interface AddressGeneratorProps {
@@ -18,11 +19,74 @@ interface WalletInfo {
   privateKey: string;
   balances: {
     ETH?: string;
+    ARB?: string;
     SUI?: string;
     SOL?: string;
   };
   index: number;
 }
+
+interface PrivateKeyModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  privateKey: string;
+  address: string;
+}
+
+const PrivateKeyModal = ({ isOpen, onClose, privateKey, address }: PrivateKeyModalProps) => {
+  const [isRevealed, setIsRevealed] = useState(false);
+  
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <div className="private-key-modal">
+        <h3>Wallet Details</h3>
+        
+        <div className="modal-field">
+          <label>Address:</label>
+          <div className="value-with-copy">
+            <div className="value">{address}</div>
+            <button 
+              className="copy-button"
+              onClick={() => copyToClipboard(address)}
+              title="Copy address"
+            >
+              📋
+            </button>
+          </div>
+        </div>
+
+        <div className="modal-field">
+          <label>Private Key:</label>
+          <div className="value-with-copy">
+            <div className="value">
+              {isRevealed ? privateKey : '********************************'}
+            </div>
+            {isRevealed && (
+              <button 
+                className="copy-button"
+                onClick={() => copyToClipboard(privateKey)}
+                title="Copy private key"
+              >
+                📋
+              </button>
+            )}
+          </div>
+        </div>
+        
+        <button 
+          className="reveal-button"
+          onClick={() => setIsRevealed(!isRevealed)}
+        >
+          {isRevealed ? 'Hide' : 'Reveal'} Private Key
+        </button>
+      </div>
+    </Modal>
+  );
+};
 
 export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
   const [numberOfAddresses, setNumberOfAddresses] = useState<number>(5);
@@ -30,12 +94,20 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [selectedNetworks, setSelectedNetworks] = useState<Network[]>(['ETH']);
+  const [activeTab, setActiveTab] = useState<Network>('ETH');
+  const [selectedWallet, setSelectedWallet] = useState<{address: string, privateKey: string} | null>(null);
 
   // Add Solana connection constant
   const solanaConnection = new Connection('https://api.mainnet-beta.solana.com');
 
   const getEthBalance = async (address: string) => {
     const provider = new ethers.JsonRpcProvider('https://eth.llamarpc.com');
+    const balance = await provider.getBalance(address);
+    return ethers.formatEther(balance);
+  };
+
+  const getArbBalance = async (address: string) => {
+    const provider = new ethers.JsonRpcProvider('https://arb1.arbitrum.io/rpc');
     const balance = await provider.getBalance(address);
     return ethers.formatEther(balance);
   };
@@ -134,6 +206,7 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
           wallet.ethAddress = walletWithProvider.address;
           wallet.privateKey = walletWithProvider.privateKey;
           balances.ETH = await getEthBalance(walletWithProvider.address);
+          balances.ARB = await getArbBalance(walletWithProvider.address);
         }
         
         if (selectedNetworks.includes('SUI')) {
@@ -166,6 +239,14 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
         ? prev.filter(n => n !== network)
         : [...prev, network]
     );
+  };
+
+  const truncateAddress = (address: string) => {
+    return `${address.slice(0, 5)}...${address.slice(-5)}`;
+  };
+
+  const openPrivateKey = (address: string, privateKey: string) => {
+    setSelectedWallet({ address, privateKey });
   };
 
   return (
@@ -236,43 +317,67 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
       </div>
 
       {wallets.length > 0 && (
-        <div className="wallets-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Index</th>
-                {selectedNetworks.includes('ETH') && <th>ETH Address</th>}
-                {selectedNetworks.includes('SUI') && <th>SUI Address</th>}
-                {selectedNetworks.includes('SOL') && <th>SOL Address</th>}
-                {selectedNetworks.includes('ETH') && <th>ETH Balance</th>}
-                {selectedNetworks.includes('SUI') && <th>SUI Balance</th>}
-                {selectedNetworks.includes('SOL') && <th>SOL Balance</th>}
-                <th>Private Key</th>
-              </tr>
-            </thead>
-            <tbody>
-              {wallets.map((wallet) => (
-                <tr key={wallet.index} className={
-                  Object.values(wallet.balances).some(balance => Number(balance) > 0) ? 'has-balance' : ''
-                }>
-                  <td>{wallet.index}</td>
-                  {selectedNetworks.includes('ETH') && <td>{wallet.ethAddress}</td>}
-                  {selectedNetworks.includes('SUI') && <td>{wallet.suiAddress}</td>}
-                  {selectedNetworks.includes('SOL') && <td>{wallet.solAddress}</td>}
-                  {selectedNetworks.includes('ETH') && <td>{wallet.balances.ETH}</td>}
-                  {selectedNetworks.includes('SUI') && <td>{wallet.balances.SUI}</td>}
-                  {selectedNetworks.includes('SOL') && <td>{wallet.balances.SOL}</td>}
-                  <td>
-                    {Object.values(wallet.balances).some(balance => Number(balance) > 0) 
-                      ? wallet.privateKey 
-                      : '***********'}
-                  </td>
+        <div className="wallets-tabs">
+          <div className="tabs-header">
+            {selectedNetworks.map(network => (
+              <button
+                key={network}
+                className={`tab-button ${activeTab === network ? 'active' : ''}`}
+                onClick={() => setActiveTab(network)}
+              >
+                {network}
+              </button>
+            ))}
+          </div>
+
+          <div className="tab-content">
+            <table>
+              <thead>
+                <tr>
+                  <th>Address</th>
+                  <th>Balance</th>
+                  {activeTab === 'ETH' && <th>ARB Balance</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {wallets.map((wallet) => {
+                  const address = activeTab === 'ETH' ? wallet.ethAddress :
+                                activeTab === 'SUI' ? wallet.suiAddress :
+                                wallet.solAddress;
+                  const balance = wallet.balances[activeTab];
+                  const arbBalance = wallet.balances.ARB;
+
+                  return address && (
+                    <tr key={`${wallet.index}-${activeTab}`} 
+                        className={Number(balance) > 0 || (activeTab === 'ETH' && Number(arbBalance) > 0) ? 'has-balance' : ''}>
+                      <td>
+                        <a 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            openPrivateKey(address, wallet.privateKey);
+                          }}
+                        >
+                          {truncateAddress(address)}
+                        </a>
+                      </td>
+                      <td>{balance}</td>
+                      {activeTab === 'ETH' && <td>{arbBalance}</td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+
+      <PrivateKeyModal
+        isOpen={!!selectedWallet}
+        onClose={() => setSelectedWallet(null)}
+        privateKey={selectedWallet?.privateKey || ''}
+        address={selectedWallet?.address || ''}
+      />
     </div>
   );
 }; 
