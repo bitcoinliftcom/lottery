@@ -1,0 +1,47 @@
+.seed-phrase-generator {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  
+  .generate-button, .copy-button {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background-color: #646cff;
+    color: white;
+    
+    &:hover {
+      background-color: #535bf2;
+    }
+  }
+
+  .seed-phrase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 2rem 0;
+    
+    .word-cell {
+      padding: 1rem;
+      background-color: #1a1a1a;
+      border-radius: 8px;
+      display: flex;
+      gap: 0.5rem;
+      
+      .word-number {
+        color: #888;
+      }
+      
+      .word {
+        color: white;
+      }
+    }
+  }
+
+  .copy-button {
+    margin-top: 1rem;
+  }
+} 
