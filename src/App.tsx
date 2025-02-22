@@ -4,7 +4,10 @@ import { SeedPhraseGenerator } from './components/SeedPhraseGenerator/SeedPhrase
 function App() {
   return (
     <div className="app">
-      <h1>Crypto Wallet Generator</h1>
+      <h1>Multi-Chain Wallet Scanner</h1>
+      <p className="description">
+        Generate seed phrases and scan for balances across Ethereum and SUI networks
+      </p>
       <SeedPhraseGenerator />
     </div>
   )
