@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { SuiClient } from '@mysten/sui.js/client';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import { Modal } from '../Modal/Modal';
+import { Network } from '../../types/networks';
 import './AddressGenerator.scss';
+import { BalanceAlert } from '../BalanceAlert/BalanceAlert';
 
 interface AddressGeneratorProps {
   seedPhrase: string[];
+  selectedNetworks: Network[];
+  toggleNetwork: (network: Network) => void;
+  onInit: (generateAddresses: () => void) => void;
 }
-
-type Network = 'ETH' | 'SUI' | 'SOL';
 
 interface WalletInfo {
   ethAddress?: string;
@@ -31,6 +34,13 @@ interface PrivateKeyModalProps {
   onClose: () => void;
   privateKey: string;
   address: string;
+}
+
+interface Balance {
+  network: string;
+  address: string;
+  privateKey: string;
+  amount: string;
 }
 
 const PrivateKeyModal = ({ isOpen, onClose, privateKey, address }: PrivateKeyModalProps) => {
@@ -88,14 +98,39 @@ const PrivateKeyModal = ({ isOpen, onClose, privateKey, address }: PrivateKeyMod
   );
 };
 
-export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
+export const AddressGenerator = ({ 
+  seedPhrase, 
+  selectedNetworks, 
+  toggleNetwork,
+  onInit
+}: AddressGeneratorProps) => {
   const [numberOfAddresses, setNumberOfAddresses] = useState<number>(5);
   const [startIndex, setStartIndex] = useState<number>(0);
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [selectedNetworks, setSelectedNetworks] = useState<Network[]>(['ETH']);
-  const [activeTab, setActiveTab] = useState<Network>('ETH');
+  const [activeTab, setActiveTab] = useState<Network>(selectedNetworks[0]);
   const [selectedWallet, setSelectedWallet] = useState<{address: string, privateKey: string} | null>(null);
+  const [foundBalances, setFoundBalances] = useState<Balance[]>([]);
+  const [showBalanceAlert, setShowBalanceAlert] = useState(false);
+
+  // Register the generateAddresses function with parent
+  useEffect(() => {
+    onInit(generateAddresses);
+  }, [onInit]);
+
+  // Auto-generate addresses when networks change
+  useEffect(() => {
+    if (selectedNetworks.length > 0) {
+      generateAddresses();
+    }
+  }, [selectedNetworks]);
+
+  // Update activeTab when selectedNetworks changes
+  useEffect(() => {
+    if (!selectedNetworks.includes(activeTab) && selectedNetworks.length > 0) {
+      setActiveTab(selectedNetworks[0]);
+    }
+  }, [selectedNetworks, activeTab]);
 
   // Add Solana connection constant
   const solanaConnection = new Connection('https://api.mainnet-beta.solana.com');
@@ -185,6 +220,51 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
     };
   };
 
+  const checkAndShowBalance = (wallet: WalletInfo) => {
+    const newBalances: Balance[] = [];
+    
+    if (wallet.ethAddress && Number(wallet.balances.ETH) > 0) {
+      newBalances.push({
+        network: 'Ethereum',
+        address: wallet.ethAddress,
+        privateKey: wallet.privateKey,
+        amount: `${wallet.balances.ETH} ETH`
+      });
+    }
+    
+    if (wallet.ethAddress && Number(wallet.balances.ARB) > 0) {
+      newBalances.push({
+        network: 'Arbitrum',
+        address: wallet.ethAddress,
+        privateKey: wallet.privateKey,
+        amount: `${wallet.balances.ARB} ARB`
+      });
+    }
+    
+    if (wallet.suiAddress && Number(wallet.balances.SUI) > 0) {
+      newBalances.push({
+        network: 'SUI',
+        address: wallet.suiAddress,
+        privateKey: wallet.privateKey,
+        amount: `${wallet.balances.SUI} SUI`
+      });
+    }
+    
+    if (wallet.solAddress && Number(wallet.balances.SOL) > 0) {
+      newBalances.push({
+        network: 'Solana',
+        address: wallet.solAddress,
+        privateKey: wallet.privateKey,
+        amount: `${wallet.balances.SOL} SOL`
+      });
+    }
+
+    if (newBalances.length > 0) {
+      setFoundBalances(newBalances);
+      setShowBalanceAlert(true);
+    }
+  };
+
   const generateAddresses = async () => {
     setIsLoading(true);
     try {
@@ -226,19 +306,15 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
         newWallets.push(wallet);
       }
       
+      for (const wallet of newWallets) {
+        checkAndShowBalance(wallet);
+      }
+      
       setWallets(newWallets);
     } catch (error) {
       console.error('Error generating addresses:', error);
     }
     setIsLoading(false);
-  };
-
-  const toggleNetwork = (network: Network) => {
-    setSelectedNetworks(prev => 
-      prev.includes(network) 
-        ? prev.filter(n => n !== network)
-        : [...prev, network]
-    );
   };
 
   const truncateAddress = (address: string) => {
@@ -377,6 +453,12 @@ export const AddressGenerator = ({ seedPhrase }: AddressGeneratorProps) => {
         onClose={() => setSelectedWallet(null)}
         privateKey={selectedWallet?.privateKey || ''}
         address={selectedWallet?.address || ''}
+      />
+
+      <BalanceAlert
+        isOpen={showBalanceAlert}
+        onClose={() => setShowBalanceAlert(false)}
+        balances={foundBalances}
       />
     </div>
   );
