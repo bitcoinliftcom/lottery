@@ -209,4 +209,31 @@
       background: #535bf2;
     }
   }
+}
+
+.auto-generate-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  background: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 4px;
+  color: #856404;
+  margin-top: 1rem;
+
+  .stop-button {
+    padding: 0.25rem 0.75rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+
+    &:hover {
+      background: #c82333;
+    }
+  }
 } 

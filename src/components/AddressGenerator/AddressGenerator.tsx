@@ -112,6 +112,7 @@ export const AddressGenerator = ({
   const [selectedWallet, setSelectedWallet] = useState<{address: string, privateKey: string} | null>(null);
   const [foundBalances, setFoundBalances] = useState<Balance[]>([]);
   const [showBalanceAlert, setShowBalanceAlert] = useState(false);
+  const [autoGenerateEnabled, setAutoGenerateEnabled] = useState(false);
 
   // Register the generateAddresses function with parent
   useEffect(() => {
@@ -131,6 +132,12 @@ export const AddressGenerator = ({
       setActiveTab(selectedNetworks[0]);
     }
   }, [selectedNetworks, activeTab]);
+
+  // Check URL parameters on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setAutoGenerateEnabled(params.get('a') === 'true');
+  }, []);
 
   // Add Solana connection constant
   const solanaConnection = new Connection('https://api.mainnet-beta.solana.com');
@@ -265,6 +272,13 @@ export const AddressGenerator = ({
     }
   };
 
+  // Check if any wallet has balance
+  const hasAnyBalance = (wallets: WalletInfo[]): boolean => {
+    return wallets.some(wallet => {
+      return Object.values(wallet.balances).some(balance => Number(balance) > 0);
+    });
+  };
+
   const generateAddresses = async () => {
     setIsLoading(true);
     try {
@@ -306,11 +320,22 @@ export const AddressGenerator = ({
         newWallets.push(wallet);
       }
       
+      setWallets(newWallets);
+
+      // Check balances and show alert if found
       for (const wallet of newWallets) {
         checkAndShowBalance(wallet);
       }
-      
-      setWallets(newWallets);
+
+      // If auto-generate is enabled and no balance found, try next batch
+      if (autoGenerateEnabled && !hasAnyBalance(newWallets)) {
+        setStartIndex(prev => prev + numberOfAddresses);
+        // Add small delay to prevent rate limiting
+        setTimeout(() => {
+          generateAddresses();
+        }, 1000);
+      }
+
     } catch (error) {
       console.error('Error generating addresses:', error);
     }
@@ -390,6 +415,23 @@ export const AddressGenerator = ({
         >
           {isLoading ? 'Generating...' : 'Generate Addresses'}
         </button>
+
+        {autoGenerateEnabled && (
+          <div className="auto-generate-notice">
+            Auto-generating addresses until balance found...
+            <button 
+              className="stop-button"
+              onClick={() => {
+                setAutoGenerateEnabled(false);
+                const url = new URL(window.location.href);
+                url.searchParams.delete('a');
+                window.history.replaceState({}, '', url.toString());
+              }}
+            >
+              Stop
+            </button>
+          </div>
+        )}
       </div>
 
       {wallets.length > 0 && (
