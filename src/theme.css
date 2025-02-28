@@ -1,0 +1,47 @@
+:root {
+  /* Base colors - light theme */
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --card-bg: #f5f5f5;
+  --card-border: #ddd;
+  --primary-color: #2e8b57;
+  --primary-hover: #228b22;
+  --secondary-bg: #e0e0e0;
+  --success-color: #00a854;
+  --input-bg: #ffffff;
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --scrollbar-track: #f0f0f0;
+  --scrollbar-thumb: #ccc;
+}
+
+[data-theme='dark'] {
+  --bg-color: #1a1a1a;
+  --text-color: #ffffff;
+  --card-bg: #2a2a2a;
+  --card-border: #444;
+  --primary-color: #3cb371;
+  --primary-hover: #43cd80;
+  --secondary-bg: #333;
+  --success-color: #52c41a;
+  --input-bg: #111;
+  --hover-bg: rgba(255, 255, 255, 0.05);
+  --scrollbar-track: #222;
+  --scrollbar-thumb: #444;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+button {
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+}
+
+input, textarea {
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  border-color: var(--card-border);
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+} 
